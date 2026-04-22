@@ -1,0 +1,515 @@
+[
+  {
+    "sample_id": 0,
+    "coded_factors": {
+      "Kp": -1.0,
+      "Ki": -1.0,
+      "Kd": -1.0
+    },
+    "params": {
+      "Kp": 5.0,
+      "Ki": 1.0,
+      "Kd": 0.09999999999999964,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 13.718256751697393,
+      "TransientTime": 24.056119972045014,
+      "SettlingTime": 24.056119972045014,
+      "SettlingMin": 0.8845459067317525,
+      "SettlingMax": 0.9766104979754663,
+      "Overshoot": 0.0,
+      "Undershoot": -0.0,
+      "Peak": 0.9766104979754663,
+      "PeakTime": 30.0
+    }
+  },
+  {
+    "sample_id": 1,
+    "coded_factors": {
+      "Kp": -1.0,
+      "Ki": -1.0,
+      "Kd": 1.0
+    },
+    "params": {
+      "Kp": 5.0,
+      "Ki": 1.0,
+      "Kd": 5.0,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 14.28808321253707,
+      "TransientTime": 24.115194849583716,
+      "SettlingTime": 24.115194849583716,
+      "SettlingMin": 0.8803937730252466,
+      "SettlingMax": 0.9780047898838787,
+      "Overshoot": 5.183270055386657e-05,
+      "Undershoot": -0.0,
+      "Peak": 0.9780047898838787,
+      "PeakTime": 29.9848014780161
+    }
+  },
+  {
+    "sample_id": 2,
+    "coded_factors": {
+      "Kp": -1.0,
+      "Ki": 1.0,
+      "Kd": -1.0
+    },
+    "params": {
+      "Kp": 5.0,
+      "Ki": 15.0,
+      "Kd": 0.09999999999999964,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.47467979181187436,
+      "TransientTime": 14.66510905907911,
+      "SettlingTime": 14.66510905907911,
+      "SettlingMin": 0.6040400409690148,
+      "SettlingMax": 1.4302072827907313,
+      "Overshoot": 42.959450035381174,
+      "Undershoot": -0.0,
+      "Peak": 1.4302072827907313,
+      "PeakTime": 1.1507061759110109
+    }
+  },
+  {
+    "sample_id": 3,
+    "coded_factors": {
+      "Kp": -1.0,
+      "Ki": 1.0,
+      "Kd": 1.0
+    },
+    "params": {
+      "Kp": 5.0,
+      "Ki": 15.0,
+      "Kd": 5.0,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 1.2769446834914169,
+      "TransientTime": 3.554010181749637,
+      "SettlingTime": 3.554010181749637,
+      "SettlingMin": 0.9006219015949907,
+      "SettlingMax": 1.0419921149604314,
+      "Overshoot": 4.197981136049145,
+      "Undershoot": -0.0,
+      "Peak": 1.0419921149604314,
+      "PeakTime": 2.7555023301684987
+    }
+  },
+  {
+    "sample_id": 4,
+    "coded_factors": {
+      "Kp": 1.0,
+      "Ki": -1.0,
+      "Kd": -1.0
+    },
+    "params": {
+      "Kp": 20.0,
+      "Ki": 1.0,
+      "Kd": 0.09999999999999964,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.2782996479401344,
+      "TransientTime": 23.15133156430787,
+      "SettlingTime": 23.15133156430787,
+      "SettlingMin": 0.5961787266653253,
+      "SettlingMax": 1.2222569312924643,
+      "Overshoot": 29.95051663778836,
+      "Undershoot": -0.0,
+      "Peak": 1.2222569312924643,
+      "PeakTime": 0.6282733314183514
+    }
+  },
+  {
+    "sample_id": 5,
+    "coded_factors": {
+      "Kp": 1.0,
+      "Ki": -1.0,
+      "Kd": 1.0
+    },
+    "params": {
+      "Kp": 20.0,
+      "Ki": 1.0,
+      "Kd": 5.0,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.252334778671723,
+      "TransientTime": 23.2369452173047,
+      "SettlingTime": 23.2369452173047,
+      "SettlingMin": 0.803641656261784,
+      "SettlingMax": 0.9439835514553895,
+      "Overshoot": 0.4045621086265827,
+      "Undershoot": -0.0,
+      "Peak": 0.9439835514553895,
+      "PeakTime": 0.47995024534465225
+    }
+  },
+  {
+    "sample_id": 6,
+    "coded_factors": {
+      "Kp": 1.0,
+      "Ki": 1.0,
+      "Kd": -1.0
+    },
+    "params": {
+      "Kp": 20.0,
+      "Ki": 15.0,
+      "Kd": 0.09999999999999964,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.2695421817090796,
+      "TransientTime": 5.327564733204422,
+      "SettlingTime": 5.327564733204422,
+      "SettlingMin": 0.6045446229746861,
+      "SettlingMax": 1.393156989938716,
+      "Overshoot": 39.31556355317078,
+      "Undershoot": -0.0,
+      "Peak": 1.393156989938716,
+      "PeakTime": 0.6651059906882949
+    }
+  },
+  {
+    "sample_id": 7,
+    "coded_factors": {
+      "Kp": 1.0,
+      "Ki": 1.0,
+      "Kd": 1.0
+    },
+    "params": {
+      "Kp": 20.0,
+      "Ki": 15.0,
+      "Kd": 5.0,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.27526850811917875,
+      "TransientTime": 3.4312227239481903,
+      "SettlingTime": 3.4312227239481903,
+      "SettlingMin": 0.89660739864472,
+      "SettlingMax": 1.0000497129488544,
+      "Overshoot": 0.0046928446982841265,
+      "Undershoot": -0.0,
+      "Peak": 1.0000497129488544,
+      "PeakTime": 29.596914997952034
+    }
+  },
+  {
+    "sample_id": 8,
+    "coded_factors": {
+      "Kp": 1.681792830507429,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 25.113446228805717,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.25833061768216686,
+      "TransientTime": 7.5692458665846685,
+      "SettlingTime": 7.5692458665846685,
+      "SettlingMin": 0.8150876724637628,
+      "SettlingMax": 1.1217472874245409,
+      "Overshoot": 12.178740134000087,
+      "Undershoot": -0.0,
+      "Peak": 1.1217472874245409,
+      "PeakTime": 0.5149026183889547
+    }
+  },
+  {
+    "sample_id": 9,
+    "coded_factors": {
+      "Kp": -1.681792830507429,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": -0.1134462288057172,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 1.7702142165399943,
+      "TransientTime": 8.218792638819068,
+      "SettlingTime": 8.218792638819068,
+      "SettlingMin": 0.9064303745408908,
+      "SettlingMax": 1.1822400597340708,
+      "Overshoot": 18.22252736460197,
+      "Undershoot": -0.0,
+      "Peak": 1.1822400597340708,
+      "PeakTime": 2.990363809750412
+    }
+  },
+  {
+    "sample_id": 10,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 1.681792830507429,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 19.772549813552004,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.37403951984097294,
+      "TransientTime": 2.1706061139736814,
+      "SettlingTime": 2.1706061139736814,
+      "SettlingMin": 0.9142532235617472,
+      "SettlingMax": 1.0866415336393151,
+      "Overshoot": 8.663775617638514,
+      "Undershoot": -0.0,
+      "Peak": 1.0866415336393151,
+      "PeakTime": 0.7503269635438843
+    }
+  },
+  {
+    "sample_id": 11,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": -1.681792830507429,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": -3.7725498135520024,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 10.42949076228301,
+      "TransientTime": 29.901201603769955,
+      "SettlingTime": 29.901850646578303,
+      "SettlingMin": -127.22881680501165,
+      "SettlingMax": -115.01783064839158,
+      "Overshoot": 0.0,
+      "Undershoot": 0.654728432261138,
+      "Peak": 127.22881680501165,
+      "PeakTime": 30.0
+    }
+  },
+  {
+    "sample_id": 12,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 1.681792830507429
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 6.670392434743201,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 2.5238413862118483,
+      "TransientTime": 5.088657678773652,
+      "SettlingTime": 5.088657678773652,
+      "SettlingMin": 0.9022313511010309,
+      "SettlingMax": 1.0000661395502086,
+      "Overshoot": 0.006434898023588431,
+      "Undershoot": -0.0,
+      "Peak": 1.0000661395502086,
+      "PeakTime": 29.564941425333874
+    }
+  },
+  {
+    "sample_id": 13,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": -1.681792830507429
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": -1.5703924347432014,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.2559943283997195,
+      "TransientTime": 29.995230258958753,
+      "SettlingTime": 29.99637755636043,
+      "SettlingMin": -0.31924342473243794,
+      "SettlingMax": 2.3348116587546386,
+      "Overshoot": 131.63504437810235,
+      "Undershoot": 31.671918622660396,
+      "Peak": 2.3348116587546386,
+      "PeakTime": 29.618929162355062
+    }
+  },
+  {
+    "sample_id": 14,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.4471211469135531,
+      "TransientTime": 5.288955672114451,
+      "SettlingTime": 5.288955672114451,
+      "SettlingMin": 0.8300656646715439,
+      "SettlingMax": 1.0000256553990625,
+      "Overshoot": 0.002222310642596703,
+      "Undershoot": -0.0,
+      "Peak": 1.0000256553990625,
+      "PeakTime": 29.534141258286816
+    }
+  },
+  {
+    "sample_id": 15,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.4471211469135531,
+      "TransientTime": 5.288955672114451,
+      "SettlingTime": 5.288955672114451,
+      "SettlingMin": 0.8300656646715439,
+      "SettlingMax": 1.0000256553990625,
+      "Overshoot": 0.002222310642596703,
+      "Undershoot": -0.0,
+      "Peak": 1.0000256553990625,
+      "PeakTime": 29.534141258286816
+    }
+  },
+  {
+    "sample_id": 16,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.4471211469135531,
+      "TransientTime": 5.288955672114451,
+      "SettlingTime": 5.288955672114451,
+      "SettlingMin": 0.8300656646715439,
+      "SettlingMax": 1.0000256553990625,
+      "Overshoot": 0.002222310642596703,
+      "Undershoot": -0.0,
+      "Peak": 1.0000256553990625,
+      "PeakTime": 29.534141258286816
+    }
+  },
+  {
+    "sample_id": 17,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.4471211469135531,
+      "TransientTime": 5.288955672114451,
+      "SettlingTime": 5.288955672114451,
+      "SettlingMin": 0.8300656646715439,
+      "SettlingMax": 1.0000256553990625,
+      "Overshoot": 0.002222310642596703,
+      "Undershoot": -0.0,
+      "Peak": 1.0000256553990625,
+      "PeakTime": 29.534141258286816
+    }
+  },
+  {
+    "sample_id": 18,
+    "coded_factors": {
+      "Kp": 0.0,
+      "Ki": 0.0,
+      "Kd": 0.0
+    },
+    "params": {
+      "Kp": 12.5,
+      "Ki": 8.0,
+      "Kd": 2.55,
+      "m": 1.0,
+      "c": 2.0,
+      "k": 5.0
+    },
+    "position_metrics": {
+      "RiseTime": 0.4471211469135531,
+      "TransientTime": 5.288955672114451,
+      "SettlingTime": 5.288955672114451,
+      "SettlingMin": 0.8300656646715439,
+      "SettlingMax": 1.0000256553990625,
+      "Overshoot": 0.002222310642596703,
+      "Undershoot": -0.0,
+      "Peak": 1.0000256553990625,
+      "PeakTime": 29.534141258286816
+    }
+  }
+]
