@@ -111,7 +111,7 @@ SIMULINK_MAT_FILE = "matlab.mat"
 # Simulink gain sweep setting
 # ============================================================
 
-TARGET_LIST = [50, 75, 100, 125, 150, 175, 200]
+TARGET_LIST = [50, 100, 150, 200]
 
 SWEEP_KP_LIST = [3.4, 3.6, 3.8, 4.0, 4.2, 4.4]
 SWEEP_KI_LIST = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5]
@@ -153,3 +153,119 @@ PID_GAIN_DB = {
     175.0: {"kp": 3.700, "ki": 3.250, "kd": 0.000},
     200.0: {"kp": 4.400, "ki": 2.500, "kd": 0.000},
 }
+
+# ============================================================
+# Disturbance settings
+# ============================================================
+
+USE_DISTURBANCE = True
+
+# disturbance mode:
+# "none", "step", "pulse", "sin"
+DISTURBANCE_MODE = "pulse"
+
+# disturbance가 시작되는 시간 [s]
+DISTURBANCE_START_TIME = 3.0
+
+# disturbance가 끝나는 시간 [s]
+DISTURBANCE_END_TIME = 6.0
+
+# disturbance 크기
+# SimpleMotorEnv에서 current 또는 rpm을 감소시키는 부하항으로 사용
+DISTURBANCE_MAGNITUDE = 20.0
+
+# sinusoidal disturbance용
+DISTURBANCE_FREQ = 1.0
+
+# ============================================================
+# Score function settings
+# ============================================================
+
+OVERSHOOT_WEIGHT = 30.0
+PWM_WEIGHT = 0.01
+SATURATION_WEIGHT = 20.0
+
+# PWM saturation 판단 기준
+# exact: PWM_MAX에 거의 도달한 경우만 saturation
+PWM_SATURATION_TOL = 1e-9
+
+# ============================================================
+# Saturation-aware adaptive gain settings
+# ============================================================
+
+USE_SATURATION_AWARE_GAIN = True
+
+# PWM_MAX=255이지만, 실제 제어에서는 이 값 이상을 saturation 위험 구간으로 간주
+PWM_SOFT_LIMIT = 240.0
+
+# saturation이 몇 step 연속 발생해야 gain 완화할지
+SATURATION_CONSECUTIVE_STEPS = 3
+
+# target 대비 error가 너무 작으면 saturation이어도 gain을 줄이지 않음
+SATURATION_ERROR_THRESHOLD_RATIO = 0.02
+
+# saturation 발생 시 gain scale 감소율
+SATURATION_KP_DECAY = 0.99
+SATURATION_KI_DECAY = 0.98
+SATURATION_KD_DECAY = 1.00
+
+# gain scale의 최소값
+SATURATION_MIN_GAIN_SCALE = 0.85
+
+# saturation이 없을 때 원래 DB gain으로 천천히 복귀하는 속도
+SATURATION_RECOVERY_RATE = 0.004
+
+# ============================================================
+# Experiment tag
+# ============================================================
+
+EXPERIMENT_TAG = "adaptive_saturation_aware"
+
+# ============================================================
+# Motor backend settings
+# ============================================================
+
+MOTOR_BACKEND = "esp32"  # "simulation" or "esp32"
+
+# ============================================================
+# ESP32 serial settings
+# ============================================================
+
+ESP32_PORT = "COM5"
+ESP32_BAUDRATE = 115200
+ESP32_TIMEOUT = 0.2
+
+# Conservative real motor limits for initial test
+REAL_PWM_MIN = 0.0
+REAL_PWM_MAX = 140.0
+REAL_PWM_SOFT_LIMIT = 120.0
+
+# ============================================================
+# Real ESP32 motor PID gain DB
+# ============================================================
+
+ESP32_REAL_PID_GAIN_DB = {
+    30.0: {"kp": 1.2000, "ki": 0.7000, "kd": 0.0000},
+    50.0: {"kp": 1.2000, "ki": 0.7000, "kd": 0.0000},
+    70.0: {"kp": 1.0000, "ki": 0.7000, "kd": 0.0000},
+}
+
+ESP32_REAL_GAIN_DB_MODE = "linear"
+
+# ============================================================
+# Real ESP32 motor gain sweep settings
+# ============================================================
+
+ESP32_SWEEP_TARGET_LIST = [30.0, 50.0, 70.0]
+
+ESP32_SWEEP_KP_LIST = [1.0, 1.2, 1.4]
+ESP32_SWEEP_KI_LIST = [0.4, 0.55, 0.7]
+ESP32_SWEEP_KD_LIST = [0.0]
+
+ESP32_SWEEP_TEST_TIME = 20.0
+ESP32_SWEEP_REST_TIME = 2.0
+
+ESP32_SWEEP_PWM_MIN = 0.0
+ESP32_SWEEP_PWM_MAX = 140.0
+ESP32_SWEEP_PWM_RATE_LIMIT = 20.0
+

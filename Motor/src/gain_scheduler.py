@@ -1,118 +1,166 @@
-import sys
-from pathlib import Path
-from typing import Optional
-
-CURRENT_DIR = Path(__file__).resolve().parent
-MOTOR_DIR = CURRENT_DIR.parent
-sys.path.append(str(MOTOR_DIR))
+import numpy as np
 
 from config import (
     DEFAULT_KP,
     DEFAULT_KI,
     DEFAULT_KD,
-    PWM_MIN,
+    KP_MIN,
+    KP_MAX,
+    KI_MIN,
+    KI_MAX,
+    KD_MIN,
+    KD_MAX,
+    GAIN_UPDATE_INTERVAL,
     PWM_MAX,
     PID_GAIN_DB,
-    USE_GAIN_DB,
     GAIN_DB_MODE,
-    GAIN_UPDATE_INTERVAL,
 )
 
-from safety_guard import SafetyGuard
+# Optional saturation-aware settings
+try:
+    from config import (
+        USE_SATURATION_AWARE_GAIN,
+        PWM_SOFT_LIMIT,
+        SATURATION_CONSECUTIVE_STEPS,
+        SATURATION_ERROR_THRESHOLD_RATIO,
+        SATURATION_KP_DECAY,
+        SATURATION_KI_DECAY,
+        SATURATION_KD_DECAY,
+        SATURATION_MIN_GAIN_SCALE,
+        SATURATION_RECOVERY_RATE,
+    )
+except ImportError:
+    USE_SATURATION_AWARE_GAIN = False
+    PWM_SOFT_LIMIT = 0.95 * PWM_MAX
+    SATURATION_CONSECUTIVE_STEPS = 3
+    SATURATION_ERROR_THRESHOLD_RATIO = 0.02
+    SATURATION_KP_DECAY = 0.98
+    SATURATION_KI_DECAY = 0.95
+    SATURATION_KD_DECAY = 1.00
+    SATURATION_MIN_GAIN_SCALE = 0.70
+    SATURATION_RECOVERY_RATE = 0.002
 
 
 class GainScheduler:
-    def __init__(
-        self,
-        target: Optional[float] = None,
-        initial_kp: float = DEFAULT_KP,
-        initial_ki: float = DEFAULT_KI,
-        initial_kd: float = DEFAULT_KD,
-    ):
-        """
-        GainScheduler
+    """
+    Target-based gain scheduler with optional saturation-aware gain scaling.
 
-        target이 주어지면 PID_GAIN_DB에서 target에 가장 가까운 gain을 초기값으로 사용.
-        target이 없으면 DEFAULT_KP, DEFAULT_KI, DEFAULT_KD를 사용.
-        """
+    Main roles:
+    1. Load initial PID gains from PID_GAIN_DB.
+    2. Use linear interpolation for unseen targets.
+    3. Optionally reduce gain scale when PWM saturation risk is detected.
+    4. Slowly recover to the original DB gain when saturation disappears.
+    """
 
-        self.guard = SafetyGuard()
+    def __init__(self, target=None):
+        self.target = target
 
-        self.update_counter = 0
-        self.update_interval = GAIN_UPDATE_INTERVAL
-        self.last_update_applied = False
+        self.step_count = 0
+        self.gain_update_flag = False
+        self.last_update_reason = "init"
+
+        self.saturation_counter = 0
+        self.saturation_active = False
+
+        # Base gains from DB
+        self.base_kp = DEFAULT_KP
+        self.base_ki = DEFAULT_KI
+        self.base_kd = DEFAULT_KD
+
+        # Gain scale for saturation-aware adaptation
+        self.kp_scale = 1.0
+        self.ki_scale = 1.0
+        self.kd_scale = 1.0
+
+        # Current gains
+        self.kp = DEFAULT_KP
+        self.ki = DEFAULT_KI
+        self.kd = DEFAULT_KD
 
         if target is not None:
-            initial_kp, initial_ki, initial_kd = self.get_initial_gains_from_target(target)
+            self.set_target(target)
 
-        self.kp = initial_kp
-        self.ki = initial_ki
-        self.kd = initial_kd
+    # ========================================================
+    # Target-based gain DB
+    # ========================================================
 
-    def get_initial_gains_from_target(self, target: float):
+    def set_target(self, target):
         """
-        Target 기반 초기 PID gain 선택 함수.
-
-        config.py에서 제어:
-        - USE_GAIN_DB
-        - GAIN_DB_MODE = "nearest" or "linear"
-        - PID_GAIN_DB
+        Set target and update base gains from PID_GAIN_DB.
         """
 
-        if not USE_GAIN_DB:
-            return DEFAULT_KP, DEFAULT_KI, DEFAULT_KD
+        self.target = float(target)
+
+        self.base_kp, self.base_ki, self.base_kd = self._get_gain_from_db(
+            self.target
+        )
+
+        # New target에서는 gain scale을 원래대로 복구
+        self.kp_scale = 1.0
+        self.ki_scale = 1.0
+        self.kd_scale = 1.0
+
+        self._apply_scaled_gains()
+
+        self.gain_update_flag = True
+        self.last_update_reason = "target_gain_db"
+
+    def _get_gain_from_db(self, target):
+        """
+        PID_GAIN_DB에서 target 기반 gain을 가져온다.
+        GAIN_DB_MODE가 linear이면 target 사이를 선형 보간한다.
+        """
 
         if not PID_GAIN_DB:
             return DEFAULT_KP, DEFAULT_KI, DEFAULT_KD
 
         target = float(target)
 
-        sorted_targets = sorted(float(k) for k in PID_GAIN_DB.keys())
+        db_targets = sorted([float(k) for k in PID_GAIN_DB.keys()])
 
-        # --------------------------------------------------------
-        # 1. nearest mode
-        # --------------------------------------------------------
+        # Exact match
+        if target in db_targets:
+            gains = PID_GAIN_DB[target]
+            return gains["kp"], gains["ki"], gains["kd"]
+
+        # Nearest mode
         if GAIN_DB_MODE == "nearest":
-            nearest_target = min(
-                sorted_targets,
-                key=lambda x: abs(x - target)
-            )
-
+            nearest_target = min(db_targets, key=lambda x: abs(x - target))
             gains = PID_GAIN_DB[nearest_target]
             return gains["kp"], gains["ki"], gains["kd"]
 
-        # --------------------------------------------------------
-        # 2. linear interpolation mode
-        # --------------------------------------------------------
-        elif GAIN_DB_MODE == "linear":
-
-            # target이 DB 범위보다 작으면 가장 작은 target gain 사용
-            if target <= sorted_targets[0]:
-                gains = PID_GAIN_DB[sorted_targets[0]]
+        # Linear interpolation mode
+        if GAIN_DB_MODE == "linear":
+            # Outside DB range: nearest endpoint
+            if target <= db_targets[0]:
+                gains = PID_GAIN_DB[db_targets[0]]
                 return gains["kp"], gains["ki"], gains["kd"]
 
-            # target이 DB 범위보다 크면 가장 큰 target gain 사용
-            if target >= sorted_targets[-1]:
-                gains = PID_GAIN_DB[sorted_targets[-1]]
+            if target >= db_targets[-1]:
+                gains = PID_GAIN_DB[db_targets[-1]]
                 return gains["kp"], gains["ki"], gains["kd"]
 
-            # target 사이 구간 찾기
-            lower_target = sorted_targets[0]
-            upper_target = sorted_targets[-1]
+            lower_target = None
+            upper_target = None
 
-            for i in range(len(sorted_targets) - 1):
-                t_low = sorted_targets[i]
-                t_high = sorted_targets[i + 1]
+            for i in range(len(db_targets) - 1):
+                t_low = db_targets[i]
+                t_high = db_targets[i + 1]
 
                 if t_low <= target <= t_high:
                     lower_target = t_low
                     upper_target = t_high
                     break
 
-            lower_gain = PID_GAIN_DB[lower_target]
-            upper_gain = PID_GAIN_DB[upper_target]
+            if lower_target is None or upper_target is None:
+                nearest_target = min(db_targets, key=lambda x: abs(x - target))
+                gains = PID_GAIN_DB[nearest_target]
+                return gains["kp"], gains["ki"], gains["kd"]
 
             ratio = (target - lower_target) / (upper_target - lower_target)
+
+            lower_gain = PID_GAIN_DB[lower_target]
+            upper_gain = PID_GAIN_DB[upper_target]
 
             kp = lower_gain["kp"] + ratio * (upper_gain["kp"] - lower_gain["kp"])
             ki = lower_gain["ki"] + ratio * (upper_gain["ki"] - lower_gain["ki"])
@@ -120,170 +168,141 @@ class GainScheduler:
 
             return kp, ki, kd
 
-        # --------------------------------------------------------
-        # 3. fallback
-        # --------------------------------------------------------
-        else:
-            print(f"Warning: Unknown GAIN_DB_MODE = {GAIN_DB_MODE}. Use default gains.")
-            return DEFAULT_KP, DEFAULT_KI, DEFAULT_KD
+        # Fallback
+        nearest_target = min(db_targets, key=lambda x: abs(x - target))
+        gains = PID_GAIN_DB[nearest_target]
+        return gains["kp"], gains["ki"], gains["kd"]
 
-    def rule_based_gain_update(
-        self,
-        target: float,
-        error: float,
-        error_derivative: float,
-        pwm: float,
-    ):
+    # ========================================================
+    # Saturation-aware gain scaling
+    # ========================================================
+
+    def update(self, target, error, error_derivative, pwm):
         """
-        Relative-error 기반 saturation-aware gain update 함수.
+        Adaptive gain update.
 
-        목적:
-        - target scale에 독립적으로 gain scheduling 수행
-        - 현재는 메타모델 학습 전 baseline rule 역할
-        - 향후 meta-model 예측 gain으로 대체 가능
+        현재는 rule-based gain search보다 saturation-aware gain scaling에 초점.
         """
 
-        new_kp = self.kp
-        new_ki = self.ki
-        new_kd = self.kd
+        self.step_count += 1
+        self.gain_update_flag = False
+        self.last_update_reason = "none"
 
-        target_abs = max(abs(target), 1e-6)
-        error_ratio = abs(error) / target_abs
+        target = float(target)
+        error = float(error)
+        pwm = float(pwm)
 
-        pwm_range = PWM_MAX - PWM_MIN
+        # Target이 바뀌면 DB gain 재설정
+        if self.target is None or abs(target - self.target) > 1e-9:
+            self.set_target(target)
 
-        high_saturation = pwm > PWM_MAX - 0.1 * pwm_range
-        low_saturation = pwm < PWM_MIN + 0.02 * pwm_range
+        if USE_SATURATION_AWARE_GAIN:
+            self._update_saturation_aware_scale(
+                target=target,
+                error=error,
+                pwm=pwm,
+            )
 
-        # 제어 안전 관점에서는 high saturation만 saturation으로 사용
-        pwm_saturated = high_saturation
-
-        # error derivative도 target scale 기준으로 정규화
-        normalized_error_derivative = abs(error_derivative) / target_abs
-
-        # 1. 오차가 큰 구간: 목표 추종성을 높이기 위해 Kp 증가
-        if error_ratio > 0.5 and not pwm_saturated:
-            new_kp += 0.05
-
-        # 2. 중간 오차 구간: Kp 완만 증가
-        if 0.2 < error_ratio <= 0.5 and not pwm_saturated:
-            new_kp += 0.02
-
-        # 3. 목표 근처에서 PWM이 높은 경우: overshoot 방지를 위해 Kp 감소
-        if error_ratio < 0.1 and high_saturation:
-            new_kp = max(0.1, new_kp - 0.02)
-
-        # 4. steady-state error 구간: 변화가 느리고 오차가 남아 있으면 Ki 증가
-        if 0.05 < error_ratio < 0.3 and normalized_error_derivative < 0.5 and not high_saturation:
-            new_ki += 0.01
-
-        # 5. 목표에 충분히 가까운데 PWM이 높은 경우: Ki 감소
-        if error_ratio < 0.03 and high_saturation:
-            new_ki = max(0.0, new_ki - 0.005)
-
-        # 6. 목표 근처에서 변화율이 크면 진동 가능성 → Kd 증가
-        if error_ratio < 0.15 and normalized_error_derivative > 5.0:
-            new_kd += 0.02
-
-        return new_kp, new_ki, new_kd
-
-    def update(
-        self,
-        target: float,
-        error: float,
-        error_derivative: float,
-        pwm: float,
-    ):
-        """
-        현재 상태를 기반으로 gain 업데이트.
-        """
-
-        self.last_update_applied = False
-
-        # 위험 상태면 default gain으로 fallback
-        if self.guard.check_fallback(error, error_derivative):
-            self.kp, self.ki, self.kd = self.guard.get_fallback_gains()
-            self.last_update_applied = True
-            return self.kp, self.ki, self.kd
-
-        self.update_counter += 1
-
-        # gain은 일정 step마다 한 번만 업데이트
-        if self.update_counter % self.update_interval != 0:
-            return self.kp, self.ki, self.kd
-
-        requested_kp, requested_ki, requested_kd = self.rule_based_gain_update(
-            target=target,
-            error=error,
-            error_derivative=error_derivative,
-            pwm=pwm,
-        )
-
-        safe_kp, safe_ki, safe_kd = self.guard.limit_gain_update(
-            prev_kp=self.kp,
-            prev_ki=self.ki,
-            prev_kd=self.kd,
-            new_kp=requested_kp,
-            new_ki=requested_ki,
-            new_kd=requested_kd,
-        )
-
-        gain_changed = (
-            abs(safe_kp - self.kp) > 1e-12
-            or abs(safe_ki - self.ki) > 1e-12
-            or abs(safe_kd - self.kd) > 1e-12
-        )
-
-        self.kp = safe_kp
-        self.ki = safe_ki
-        self.kd = safe_kd
-
-        self.last_update_applied = gain_changed
+        self._apply_scaled_gains()
 
         return self.kp, self.ki, self.kd
+
+    def _update_saturation_aware_scale(self, target, error, pwm):
+        """
+        PWM saturation 위험이 있으면 gain scale을 낮추고,
+        saturation이 없으면 천천히 원래 gain으로 복귀.
+        """
+
+        error_ratio = abs(error) / max(abs(target), 1e-6)
+
+        high_pwm_risk = pwm >= PWM_SOFT_LIMIT
+        meaningful_error = error_ratio >= SATURATION_ERROR_THRESHOLD_RATIO
+
+        if high_pwm_risk and meaningful_error:
+            self.saturation_counter += 1
+        else:
+            self.saturation_counter = 0
+
+        if self.saturation_counter >= SATURATION_CONSECUTIVE_STEPS:
+            old_kp_scale = self.kp_scale
+            old_ki_scale = self.ki_scale
+            old_kd_scale = self.kd_scale
+
+            self.kp_scale = max(
+                SATURATION_MIN_GAIN_SCALE,
+                self.kp_scale * SATURATION_KP_DECAY,
+            )
+            self.ki_scale = max(
+                SATURATION_MIN_GAIN_SCALE,
+                self.ki_scale * SATURATION_KI_DECAY,
+            )
+            self.kd_scale = max(
+                SATURATION_MIN_GAIN_SCALE,
+                self.kd_scale * SATURATION_KD_DECAY,
+            )
+
+            self.saturation_active = True
+
+            if (
+                abs(self.kp_scale - old_kp_scale) > 1e-12
+                or abs(self.ki_scale - old_ki_scale) > 1e-12
+                or abs(self.kd_scale - old_kd_scale) > 1e-12
+            ):
+                self.gain_update_flag = True
+                self.last_update_reason = "saturation_gain_reduction"
+
+        else:
+            # saturation이 없으면 원래 DB gain으로 천천히 복귀
+            if self.kp_scale < 1.0 or self.ki_scale < 1.0 or self.kd_scale < 1.0:
+                self.kp_scale = min(1.0, self.kp_scale + SATURATION_RECOVERY_RATE)
+                self.ki_scale = min(1.0, self.ki_scale + SATURATION_RECOVERY_RATE)
+                self.kd_scale = min(1.0, self.kd_scale + SATURATION_RECOVERY_RATE)
+
+                self.gain_update_flag = True
+                self.last_update_reason = "saturation_recovery"
+
+            self.saturation_active = False
+
+    def _apply_scaled_gains(self):
+        """
+        base gain과 scale을 곱해서 현재 gain 계산.
+        """
+
+        self.kp = np.clip(self.base_kp * self.kp_scale, KP_MIN, KP_MAX)
+        self.ki = np.clip(self.base_ki * self.ki_scale, KI_MIN, KI_MAX)
+        self.kd = np.clip(self.base_kd * self.kd_scale, KD_MIN, KD_MAX)
+
+        self.kp = float(self.kp)
+        self.ki = float(self.ki)
+        self.kd = float(self.kd)
+
+    # ========================================================
+    # Getter
+    # ========================================================
 
     def get_gains(self):
         return self.kp, self.ki, self.kd
 
-    def get_scheduler_state(self) -> dict:
-        """
-        Gain scheduler 내부 상태 반환
-        """
-
+    def get_scheduler_state(self):
         return {
+            "target": self.target,
+
             "kp": self.kp,
             "ki": self.ki,
             "kd": self.kd,
-            "update_counter": self.update_counter,
-            "update_interval": self.update_interval,
-            "gain_update_flag": self.last_update_applied,
+
+            "base_kp": self.base_kp,
+            "base_ki": self.base_ki,
+            "base_kd": self.base_kd,
+
+            "kp_scale": self.kp_scale,
+            "ki_scale": self.ki_scale,
+            "kd_scale": self.kd_scale,
+
+            "gain_update_flag": self.gain_update_flag,
+            "last_update_reason": self.last_update_reason,
+
+            "saturation_counter": self.saturation_counter,
+            "saturation_active": self.saturation_active,
+            "pwm_soft_limit": PWM_SOFT_LIMIT,
         }
-
-
-if __name__ == "__main__":
-    scheduler = GainScheduler(target=100)
-
-    test_states = [
-        {"target": 100, "error": 100, "error_derivative": 50, "pwm": 50},
-        {"target": 100, "error": 50, "error_derivative": 30, "pwm": 40},
-        {"target": 100, "error": 20, "error_derivative": 5, "pwm": 25},
-        {"target": 100, "error": 5, "error_derivative": 1, "pwm": 20},
-        {"target": 200, "error": 100, "error_derivative": 300, "pwm": 200},
-    ]
-
-    for i, state in enumerate(test_states):
-        kp, ki, kd = scheduler.update(
-            target=state["target"],
-            error=state["error"],
-            error_derivative=state["error_derivative"],
-            pwm=state["pwm"],
-        )
-
-        print(
-            f"step={i}, "
-            f"target={state['target']}, "
-            f"error={state['error']}, "
-            f"error_derivative={state['error_derivative']}, "
-            f"pwm={state['pwm']}, "
-            f"kp={kp:.3f}, ki={ki:.3f}, kd={kd:.3f}"
-        )

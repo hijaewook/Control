@@ -3,8 +3,8 @@ from pathlib import Path
 from datetime import datetime
 import itertools
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 # ============================================================
@@ -13,83 +13,127 @@ import numpy as np
 
 CURRENT_DIR = Path(__file__).resolve().parent
 MOTOR_DIR = CURRENT_DIR.parent
-
 sys.path.append(str(MOTOR_DIR))
-sys.path.append(str(CURRENT_DIR))
-
-
-# ============================================================
-# Import project modules
-# ============================================================
 
 from simulink_runner import SimulinkRunner
-
 from config import (
+    RESULTS_DIR,
+    SIMULINK_MODEL_NAME,
+    SIMULINK_MAT_FILE,
+    SIMULINK_SWEEP_STOP_TIME,
     TARGET_LIST,
     SWEEP_KP_LIST,
     SWEEP_KI_LIST,
     SWEEP_KD_LIST,
-    SIMULINK_SWEEP_STOP_TIME,
+    PWM_MAX,
+    PWM_MIN,
+    OVERSHOOT_WEIGHT,
+    PWM_WEIGHT,
+    SATURATION_WEIGHT,
+    PWM_SATURATION_TOL,
 )
 
 
 # ============================================================
-# Output directory
+# Result path
 # ============================================================
 
-SAVE_DIR = MOTOR_DIR / "results" / "simulink_gain_db"
-
-
-# ============================================================
-# Score weights
-# ============================================================
-# score = IAE + OVERSHOOT_WEIGHT * overshoot_percent + PWM_WEIGHT * total_pwm
-# target 150, 200에서 overshoot가 커졌으므로 overshoot penalty를 강하게 둠
-
-OVERSHOOT_WEIGHT = 30.0
-PWM_WEIGHT = 0.01
+SAVE_DIR = RESULTS_DIR / "simulink_gain_db"
 
 
 # ============================================================
-# Metric calculation
+# Metric functions
 # ============================================================
 
-def calculate_metrics(df: pd.DataFrame, target: float) -> dict:
+def compute_dt(time: np.ndarray) -> np.ndarray:
     """
-    Simulink simulation result dataframe에서 성능 지표 계산
+    time 배열에서 dt 배열 계산.
     """
+    if len(time) <= 1:
+        return np.zeros_like(time)
 
-    time = df["time"].to_numpy()
-    current = df["current"].to_numpy()
-    error = df["error"].to_numpy()
-    pwm = df["pwm"].to_numpy()
-
-    abs_error = np.abs(error)
-
-    # Time step
     dt = np.diff(time, prepend=time[0])
     dt[0] = 0.0
 
+    return dt
+
+
+def calculate_control_metrics(df: pd.DataFrame) -> dict:
+    """
+    Simulink log dataframe에서 제어 성능 지표 계산.
+    """
+
+    required_cols = ["time", "target", "current", "error", "pwm"]
+
+    for col in required_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column: {col}")
+
+    time = df["time"].to_numpy(dtype=float)
+    target = df["target"].to_numpy(dtype=float)
+    current = df["current"].to_numpy(dtype=float)
+    error = df["error"].to_numpy(dtype=float)
+    pwm = df["pwm"].to_numpy(dtype=float)
+
+    dt = compute_dt(time)
+    abs_error = np.abs(error)
+
+    target_value = float(target[-1])
+
+    # --------------------------------------------------------
     # Error metrics
-    final_error = float(abs_error[-1])
-    mean_abs_error = float(np.mean(abs_error))
+    # --------------------------------------------------------
 
     iae = float(np.sum(abs_error * dt))
     ise = float(np.sum((error ** 2) * dt))
+    mean_abs_error = float(np.mean(abs_error))
+    final_error = float(abs_error[-1])
 
-    # PWM metrics
-    mean_pwm = float(np.mean(np.abs(pwm)))
-    total_pwm = float(np.sum(np.abs(pwm) * dt))
-    max_pwm = float(np.max(np.abs(pwm)))
-
+    # --------------------------------------------------------
     # Overshoot
-    max_current = float(np.max(current))
-    overshoot = max(0.0, max_current - target)
-    overshoot_percent = overshoot / max(abs(target), 1e-6) * 100.0
+    # --------------------------------------------------------
 
+    max_current = float(np.max(current))
+    overshoot = max(0.0, max_current - target_value)
+    overshoot_percent = overshoot / max(abs(target_value), 1e-6) * 100.0
+
+    # --------------------------------------------------------
+    # PWM effort
+    # --------------------------------------------------------
+
+    abs_pwm = np.abs(pwm)
+
+    mean_pwm = float(np.mean(abs_pwm))
+    total_pwm = float(np.sum(abs_pwm * dt))
+    max_pwm = float(np.max(pwm))
+    min_pwm = float(np.min(pwm))
+
+    # --------------------------------------------------------
+    # Saturation metrics
+    # --------------------------------------------------------
+
+    high_saturation = pwm >= PWM_MAX - PWM_SATURATION_TOL
+    low_saturation = pwm <= PWM_MIN + PWM_SATURATION_TOL
+    saturation_mask = high_saturation | low_saturation
+
+    saturation_count = int(np.sum(saturation_mask))
+    saturation_ratio_percent = float(
+        saturation_count / max(len(pwm), 1) * 100.0
+    )
+    saturation_duration = float(np.sum(dt[saturation_mask]))
+
+    high_saturation_count = int(np.sum(high_saturation))
+    high_saturation_ratio_percent = float(
+        high_saturation_count / max(len(pwm), 1) * 100.0
+    )
+    high_saturation_duration = float(np.sum(dt[high_saturation]))
+
+    # --------------------------------------------------------
     # Rise time: 10% -> 90%
-    y_10 = 0.1 * target
-    y_90 = 0.9 * target
+    # --------------------------------------------------------
+
+    y_10 = 0.1 * target_value
+    y_90 = 0.9 * target_value
 
     try:
         t_10 = time[np.where(current >= y_10)[0][0]]
@@ -98,262 +142,188 @@ def calculate_metrics(df: pd.DataFrame, target: float) -> dict:
     except IndexError:
         rise_time = np.nan
 
-    # Settling time: ±2% band
-    tolerance = 0.02 * abs(target)
-    lower = target - tolerance
-    upper = target + tolerance
+    # --------------------------------------------------------
+    # Settling time: ±2%
+    # --------------------------------------------------------
+
+    tolerance = 0.02 * abs(target_value)
+    lower = target_value - tolerance
+    upper = target_value + tolerance
+
+    within_band = (current >= lower) & (current <= upper)
 
     settling_time = np.nan
-    within_band = (current >= lower) & (current <= upper)
 
     for i in range(len(time)):
         if np.all(within_band[i:]):
             settling_time = float(time[i])
             break
 
-    # Score
+    # --------------------------------------------------------
+    # Saturation-aware score
+    # --------------------------------------------------------
+
     score = (
         iae
         + OVERSHOOT_WEIGHT * overshoot_percent
         + PWM_WEIGHT * total_pwm
+        + SATURATION_WEIGHT * saturation_ratio_percent
     )
 
     return {
-        "final_error": final_error,
-        "mean_abs_error": mean_abs_error,
         "IAE": iae,
         "ISE": ise,
-        "overshoot": overshoot,
-        "overshoot_percent": overshoot_percent,
-        "max_pwm": max_pwm,
-        "mean_pwm": mean_pwm,
-        "total_pwm": total_pwm,
+        "mean_abs_error": mean_abs_error,
+        "final_error": final_error,
+
         "rise_time": rise_time,
         "settling_time": settling_time,
-        "score": float(score),
+        "overshoot_percent": overshoot_percent,
+
+        "mean_pwm": mean_pwm,
+        "total_pwm": total_pwm,
+        "max_pwm": max_pwm,
+        "min_pwm": min_pwm,
+
+        "saturation_count": saturation_count,
+        "saturation_ratio_percent": saturation_ratio_percent,
+        "saturation_duration": saturation_duration,
+        "high_saturation_count": high_saturation_count,
+        "high_saturation_ratio_percent": high_saturation_ratio_percent,
+        "high_saturation_duration": high_saturation_duration,
+
+        "score": score,
     }
 
 
 # ============================================================
-# Gain sweep
+# Sweep
 # ============================================================
 
 def run_gain_sweep():
     """
-    Target list와 PID gain 조합에 대해 Simulink PID gain sweep 실행
+    Simulink PID gain sweep 실행.
     """
 
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = SAVE_DIR / f"simulink_gain_sweep_{timestamp}.csv"
 
-    runner = SimulinkRunner()
+    runner = SimulinkRunner(
+        model_name=SIMULINK_MODEL_NAME,
+        mat_file_name=SIMULINK_MAT_FILE,
+    )
 
-    results = []
+    rows = []
 
-    sweep_combinations = list(
-        itertools.product(
+    total_cases = (
+        len(TARGET_LIST)
+        * len(SWEEP_KP_LIST)
+        * len(SWEEP_KI_LIST)
+        * len(SWEEP_KD_LIST)
+    )
+
+    case_idx = 0
+
+    try:
+        for target, kp, ki, kd in itertools.product(
             TARGET_LIST,
             SWEEP_KP_LIST,
             SWEEP_KI_LIST,
             SWEEP_KD_LIST,
-        )
-    )
+        ):
+            case_idx += 1
 
-    total_cases = len(sweep_combinations)
-
-    print("=" * 80)
-    print("Simulink Gain Sweep Start")
-    print(f"Target list: {TARGET_LIST}")
-    print(f"Kp list: {SWEEP_KP_LIST}")
-    print(f"Ki list: {SWEEP_KI_LIST}")
-    print(f"Kd list: {SWEEP_KD_LIST}")
-    print(f"Stop time: {SIMULINK_SWEEP_STOP_TIME}")
-    print(f"Overshoot weight: {OVERSHOOT_WEIGHT}")
-    print(f"PWM weight: {PWM_WEIGHT}")
-    print(f"Total cases: {total_cases}")
-    print(f"Save path: {save_path}")
-    print("=" * 80)
-
-    try:
-        for idx, (target, kp, ki, kd) in enumerate(sweep_combinations, start=1):
             print(
-                f"[{idx}/{total_cases}] "
-                f"target={target}, Kp={kp}, Ki={ki}, Kd={kd}"
+                f"[{case_idx}/{total_cases}] "
+                f"Run Simulink: target={target}, "
+                f"Kp={kp}, Ki={ki}, Kd={kd}"
             )
 
             try:
                 df = runner.run_simulation(
+                    target=target,
                     kp=kp,
                     ki=ki,
                     kd=kd,
-                    target=target,
                     stop_time=SIMULINK_SWEEP_STOP_TIME,
                     save_log=False,
                 )
 
-                metrics = calculate_metrics(df, target=target)
+                metrics = calculate_control_metrics(df)
 
                 row = {
-                    "case_id": idx,
                     "target": target,
-                    "stop_time": SIMULINK_SWEEP_STOP_TIME,
                     "kp": kp,
                     "ki": ki,
                     "kd": kd,
-                    **metrics,
-                    "success": True,
-                    "error_message": "",
                 }
+                row.update(metrics)
+
+                rows.append(row)
 
             except Exception as e:
-                row = {
-                    "case_id": idx,
-                    "target": target,
-                    "stop_time": SIMULINK_SWEEP_STOP_TIME,
-                    "kp": kp,
-                    "ki": ki,
-                    "kd": kd,
-                    "final_error": np.nan,
-                    "mean_abs_error": np.nan,
-                    "IAE": np.nan,
-                    "ISE": np.nan,
-                    "overshoot": np.nan,
-                    "overshoot_percent": np.nan,
-                    "max_pwm": np.nan,
-                    "mean_pwm": np.nan,
-                    "total_pwm": np.nan,
-                    "rise_time": np.nan,
-                    "settling_time": np.nan,
-                    "score": np.nan,
-                    "success": False,
-                    "error_message": str(e),
-                }
-
-                print(f"  Failed: {e}")
-
-            results.append(row)
-
-            # 중간 저장
-            pd.DataFrame(results).to_csv(
-                save_path,
-                index=False,
-                encoding="utf-8-sig",
-            )
+                print(
+                    f"Failed: target={target}, "
+                    f"Kp={kp}, Ki={ki}, Kd={kd}"
+                )
+                print(f"Reason: {e}")
 
     finally:
         runner.stop()
 
-    result_df = pd.DataFrame(results)
+    result_df = pd.DataFrame(rows)
+
+    save_path = SAVE_DIR / f"simulink_gain_sweep_{timestamp}.csv"
+    result_df.to_csv(save_path, index=False, encoding="utf-8-sig")
 
     print("=" * 80)
     print("Simulink Gain Sweep Finished")
     print(f"Saved: {save_path}")
     print("=" * 80)
 
-    success_df = result_df[result_df["success"] == True].copy()
-
-    if success_df.empty:
-        print("\nNo successful simulation results.")
-        return result_df
-
-    # ========================================================
-    # 전체 기준 출력
-    # ========================================================
-
-    print("\nTop 5 by IAE:")
-    print(
-        success_df.sort_values("IAE")
-        .head(5)
-        [
-            [
-                "target",
-                "kp",
-                "ki",
-                "kd",
-                "IAE",
-                "score",
-                "settling_time",
-                "rise_time",
-                "overshoot_percent",
-                "mean_pwm",
-            ]
+    if len(result_df) > 0:
+        print("\nTop 5 by Saturation-aware Score:")
+        display_cols = [
+            "target",
+            "kp",
+            "ki",
+            "kd",
+            "score",
+            "IAE",
+            "settling_time",
+            "rise_time",
+            "overshoot_percent",
+            "mean_pwm",
+            "total_pwm",
+            "max_pwm",
+            "saturation_ratio_percent",
         ]
-    )
+        display_cols = [col for col in display_cols if col in result_df.columns]
 
-    print("\nTop 5 by Score:")
-    print(
-        success_df.sort_values("score")
-        .head(5)
-        [
-            [
-                "target",
-                "kp",
-                "ki",
-                "kd",
-                "score",
-                "IAE",
-                "settling_time",
-                "rise_time",
-                "overshoot_percent",
-                "mean_pwm",
-                "total_pwm",
-            ]
-        ]
-    )
+        print(
+            result_df
+            .sort_values("score")
+            [display_cols]
+            .head(5)
+        )
 
-    # ========================================================
-    # Target별 Best 출력
-    # ========================================================
+        print("\nBest gain by target using Saturation-aware Score:")
+        best_by_target = (
+            result_df
+            .sort_values("score")
+            .groupby("target", as_index=False)
+            .first()
+        )
 
-    print("\nBest gain by target using IAE:")
-    print(
-        success_df.sort_values("IAE")
-        .groupby("target", as_index=False)
-        .head(1)
-        [
-            [
-                "target",
-                "kp",
-                "ki",
-                "kd",
-                "IAE",
-                "score",
-                "settling_time",
-                "rise_time",
-                "overshoot_percent",
-                "mean_pwm",
-            ]
-        ]
-        .sort_values("target")
-    )
+        print(best_by_target[display_cols])
 
-    print("\nBest gain by target using Score:")
-    print(
-        success_df.sort_values("score")
-        .groupby("target", as_index=False)
-        .head(1)
-        [
-            [
-                "target",
-                "kp",
-                "ki",
-                "kd",
-                "score",
-                "IAE",
-                "settling_time",
-                "rise_time",
-                "overshoot_percent",
-                "mean_pwm",
-                "total_pwm",
-            ]
-        ]
-        .sort_values("target")
-    )
+    return result_df, save_path
 
-    return result_df
 
+# ============================================================
+# Main
+# ============================================================
 
 if __name__ == "__main__":
     run_gain_sweep()
